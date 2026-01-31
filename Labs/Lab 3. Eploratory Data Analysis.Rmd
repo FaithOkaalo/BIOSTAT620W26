@@ -2,11 +2,20 @@
 title: "Lab 3. Exploratory Data Analysis"
 author: "Faith Okaalo"
 date: "2026-01-29"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library (tidyverse)
+library (leaflet)
+library (corrplot)
+
 ```
 
 
