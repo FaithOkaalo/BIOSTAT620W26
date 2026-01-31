@@ -1,0 +1,177 @@
+---
+title: "Lab 3. Exploratory Data Analysis"
+author: "Faith Okaalo"
+date: "2026-01-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Step 1: Read in the data.
+```{r}
+met <- read.csv("C:/Users/faith/Downloads/met_all.gz")
+```
+
+# Step 2: Check the dimensions, headers, footers
+```{r}
+dim(met)
+```
+## The met dataset has a total of 2,377,343 observations and 30 variables
+
+# Step 3: Take a look at all the variables
+```{r}
+str(met)
+```
+# Most of the variables seem to be appropriately stored. Measurement variables such as temperature, wind speed, relative humidity, and atmospheric pressure are stored as numeric or integer types, while quality control and code variables are stored as character or integer values. I noticed that station identifier variables (USAFID and WBAN) are stored as integers, although they may just be identifiers rather than quantities and may be better stored as character variables instead.
+
+# Step 4: Take a closer look at the key variables (year, day, hour, temp, elev, wind.sp). Hint: use table and/or summary)
+```{r}
+# Year
+table(met$year)
+```
+```{r}
+# day
+table(met$day)
+```
+```{r}
+#hour
+table(met$hour)
+```
+# The year, day, hour variables look okay
+```{r}
+#temp
+summary(met$temp)
+```
+```{r}
+#elev
+summary(met$elev)
+```
+```{r}
+#windspeed
+summary(met$wind.sp)
+```
+# Replace elevations with 9999 as NA
+```{r}
+met$elev[met$elev == 9999] <- NA
+summary(met$elev)
+```
+# At what elevation is the highest weather station?
+```{r}
+max(met$elev, na.rm = TRUE)
+
+```
+# The highest weather station elevation in the met dataset is 4,113 meters
+
+## Removing observations with -40 and the NA temperature points
+```{r}
+met <- met[!is.na(met$temp) & met$temp != -40, ]
+summary(met$temp)
+
+```
+# Check the data against external sources 
+```{r}
+met[met$temp == -17.2, c("USAFID", "WBAN", "lat", "lon", "elev", "temp")]
+```
+```{r}
+unique(met$month[met$temp == -17.2])
+
+```
+
+# The location that matches (38.76, -104.3) corresponds to Colorado. Though this temparature was recorded in August which makes it suspicious or unlikely. 
+# Remove the -17.2 temperature 
+```{r}
+met <- met[met$temp != -17.2, ]
+summary(met$temp)
+
+```
+
+```{r}
+met[met$temp < -17, c("month", "lat", "lon", "elev", "temp")]
+summary(met$temp)
+sort(unique(met$temp[met$temp <= -17]))
+met[met$temp <= -17, c("month", "lat", "lon", "elev", "temp")]
+
+
+```
+
+# Remove the -17 temperature which is impossible for Colorado (38.767, -104.3) and Southern Texas (27.901, -98.052)
+```{r}
+met <- met[met$temp > -17, ]
+summary(met$temp)
+
+```
+```{r}
+met[met$temp <= -3, c("month", "lat", "lon", "elev", "temp")]
+
+```
+
+# Step 6: Calculate summary statistics. We want to pick out the weather station with maximum elevation and examine its windspeed and temperature.Some ideas: select the weather station with maximum elevation; within this station, look at the correlation between temperature and wind speed; look at the correlation between each of temperature and wind speed with each of hour and day.
+```{r}
+high_station <- met[met$elev == max(met$elev, na.rm = TRUE), ]
+nrow(high_station)                      
+unique(high_station[, c("USAFID","WBAN","elev")])  
+summary(high_station$temp)
+summary(high_station$wind.sp)
+
+```
+```{r}
+cor(high_station$temp, high_station$wind.sp, use="complete.obs")
+cor(high_station$temp, high_station$hour,   use="complete.obs")
+cor(high_station$temp, high_station$day,    use="complete.obs")
+cor(high_station$wind.sp, high_station$hour,use="complete.obs")
+cor(high_station$wind.sp, high_station$day, use="complete.obs")
+```
+# At the highest-elevation weather station (4,113 m), the correlation between temperature and wind speed was weak (r = −0.09). Temperature had a moderate positive correlation with hour  (r= 0.44). There was no meaningful correlation between temperature and day of month (r = -0.003). Wind speed showed weak correlation with hour of the day (r = 0.08) but a moderate positive correlation with day of month (r = 0.36).
+
+# STEP 7: Exploratory graphs
+```{r}
+hist(met$elev, main = "Elevation", xlab = "Elevation (m)")
+hist(met$temp, main = "Temperature", xlab = "Temperature (°C)")
+hist(met$wind.sp, main = "Wind Speed", xlab = "Wind Speed")
+
+```
+# Look at where the weather station with highest elevation is located.
+```{r}
+leaflet(high_station) %>% addProviderTiles("OpenStreetMap") %>% addCircles(lat = ~lat, lng = ~lon, radius = 100, fillOpacity = 1)
+
+```
+# The highest elevation weather station is located in Colorado in the Rocky Mountains.
+
+# Look at the time series of temperature and wind speed at this location. For this we will need to create a date-time variable for the x-axis.
+```{r}
+high_station$date <- with(high_station, ymd_h(paste(year, month, day, hour, sep = " ")))
+summary(high_station$date)
+
+```
+```{r}
+sum(is.na(high_station$date))
+```
+```{r}
+high_station <- high_station[!is.na(high_station$date), ]
+high_station <- high_station[order(high_station$date), ]
+
+```
+
+```{r}
+plot(high_station$date, high_station$temp, type = "l")
+plot(high_station$date, high_station$wind.sp, type = "l")
+
+```
+#The time series plot at the highest-elevation weather station shows a consistent daily cycle with regular increases and decreases occurring at approximately 24-hour intervals.The wind speed has variability with episodic spikes and no clear daily cycle.
+
+# Part 8: Ask questions
+# A few questions that come to mind are: How strongly are temperature and dew point related? #Does atmospheric pressure decrease with elevation? Is relative humidity higher when temperature is lower?
+```{r}
+# Pairwise correlations
+pairs(met[, c("temp", "dew.point", "wind.sp", "atm.press", "rh")])
+
+```
+```{r}
+vars <- met[, c("temp", "dew.point", "wind.sp", "atm.press", "rh", "elev")]
+corrplot(cor(vars, use = "complete.obs"))
+
+```
+
