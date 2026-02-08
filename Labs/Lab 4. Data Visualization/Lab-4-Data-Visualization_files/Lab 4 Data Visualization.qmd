@@ -1,0 +1,392 @@
+---
+title: "Lab 4: Data Visualization"
+format: html
+editor: visual
+embed-resources: true
+---
+
+Load required libraries
+
+```{r}
+library(ggplot2) 
+library(dplyr) 
+library(lubridate) 
+library(scales)
+library(ggforce)
+
+```
+
+# Step 1: Read in the data
+
+```{r}
+covid_data <- read.csv("C:/Users/faith/Downloads/covid_processed.csv")
+```
+
+Explore the data structure
+
+```{r}
+str(covid_data)
+head(covid_data)
+```
+
+# Step 2: Prepare the data
+
+Since states have different population sizes, make sure that you are working with population-normalized rates (e.g. units cases per 100,000 population). Transform the following variables accordingly: `cases`, `hosp`, `booster`, `series`, `deaths`
+
+```{r}
+#Normalize variables to per 100,000 population
+covid_data <- covid_data %>%
+  mutate(
+    cases_per100k = (cases / pop) * 100000,
+    hosp_per100k = (hosp / pop) * 100000,
+    deaths_per100k = (deaths / pop) * 100000,
+    series_per100k = (series / pop) * 100000,
+    booster_per100k = (booster / pop) * 100000
+  )
+
+```
+
+-   Use the `ymd` function from the `lubridate` to convert the date variable to a Date object. This is easier to work with for arithmetic and plotting.
+
+    ```{r}
+    covid_data$date <- ymd(covid_data$date)
+    ```
+
+<!-- -->
+
+-   Compute the mean by state of the normalized variables above. We recommend creating a new data.frame with the state-averaged data. Keep any other relevant variables from the original data (e.g. population, region_name etc).
+
+    ```{r}
+    state_avg_data <- covid_data %>%
+      group_by(state, region_name) %>%
+      summarise(
+        pop = first(pop),  # ADD THIS LINE HERE
+        mean_cases = mean(cases_per100k, na.rm = TRUE),
+        mean_hosp = mean(hosp_per100k, na.rm = TRUE),
+        mean_deaths = mean(deaths_per100k, na.rm = TRUE),
+        mean_series = mean(series_per100k, na.rm = TRUE),
+        mean_booster = mean(booster_per100k, na.rm = TRUE),
+        .groups = "drop"
+      )
+    ```
+
+<!-- -->
+
+-   Create a binary categorical variable for population.
+
+    ```{r}
+    median_pop <- median(state_avg_data$pop)
+    state_avg_data <- state_avg_data %>%
+      mutate(pop_category = ifelse(pop >= median_pop, "High", "Low"))
+    ```
+
+<!-- -->
+
+-   Make sure that region is a factor
+
+    ```{r}
+    state_avg_data$region_name <- as.factor(state_avg_data$region_name)
+    covid_data$region_name <- as.factor(covid_data$region_name)
+    ```
+
+# STEP 3: **Use `geom_violin` to examine the case rates and death rates by region**.
+
+```{r}
+p3_cases <- ggplot(state_avg_data, aes(x = 1, y = mean_cases, fill = region_name)) +
+  geom_violin() +
+  facet_wrap(~ region_name, ncol = 5) +
+  labs(
+    title = "Distribution of Mean COVID-19 Case Rates by Region",
+    y = "Mean Cases per 100,000 Population",
+    x = ""
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none"
+  )
+
+print(p3_cases)
+ggsave("step3_cases_violin.png", width = 12, height = 6)
+
+```
+
+-   The geom_violin plot shows regional variation, with some regions showing high variability in mean COVID-19 case rates. Some regions had moderate case transmissions while some had higher transmission. The mean COVID-19 case rates varied substantially across regions, for instance the southeast and south central had higher central values and wider distributions while Central plains had relatively uniform case rates.
+
+-   Death rates by region
+
+```{r}
+p3_deaths <- ggplot(state_avg_data, aes(x = 1, y = mean_deaths, fill = region_name)) +
+  geom_violin() +
+  facet_wrap(~ region_name, ncol = 5) +
+  labs(
+    title = "Distribution of Mean COVID-19 Death Rates by Region",
+    y = "Mean Deaths per 100,000 Population",
+    x = ""
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none"
+  )
+
+print(p3_deaths)
+ggsave("step3_deaths_violin.png", width = 12, height = 6)
+```
+
+The mean COVID-19 death rates showed less variability than case rates, but still had clear regional differences, with the Southeast and South Central again demonstrating higher and more variable mortality across states.
+
+# **Step 4: Use `geom_point` with `stat_smooth` to examine the association between time and case rates by region.**
+
+-   Filter the data over time to two weeks after the first date in the dataset
+
+```{r}
+min_date <- min(covid_data$date, na.rm = TRUE)
+filtered_data <- covid_data %>%
+  filter(date >= min_date + weeks(2))
+```
+
+-   Plot with default smooth
+
+```{r}
+p4 <- ggplot(filtered_data, aes(x = date, y = cases_per100k, color = region_name)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  stat_smooth(span = 0.5, se = TRUE) +
+  labs(
+    title = "COVID-19 Case Rates Over Time by Region",
+    x = "Date",
+    y = "Cases per 100,000 Population",
+    color = "Region"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+print(p4)
+ggsave("step4_time_series.png", width = 12, height = 6)
+```
+
+COVID-19 case rates exhibited clear temporal waves across all regions, with a pronounced peak in late 2020–early 2021 and a second rise in mid-to-late 2021.
+
+Try with linear model for comparison
+
+```{r}
+p4_lm <- ggplot(filtered_data, aes(x = date, y = cases_per100k, color = region_name)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  stat_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "COVID-19 Case Rates Over Time by Region (Linear Model)",
+    x = "Date",
+    y = "Cases per 100,000 Population",
+    color = "Region"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+print(p4_lm)
+ggsave("step4_time_series_lm.png", width = 12, height = 6)
+```
+
+The linear model indicates a positive overall trend in case rates over time across all regions, despite substantial short-term fluctuations
+
+# STEP 5: Bar plot of states by population category.
+
+```{r}
+# Count states by population category and region_name
+pop_counts <- state_avg_data %>%
+  group_by(pop_category, region_name) %>%
+  summarise(count = n(), .groups = "drop")
+
+p5 <- ggplot(pop_counts, aes(x = pop_category, y = count, fill = region_name)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "Number of States by Population Category and Region",
+    x = "Population Category",
+    y = "Number of States",
+    fill = "Region"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+print(p5)
+ggsave("step5_barplot.png", width = 10, height = 6)
+
+```
+
+Regions differ in their population composition, with some regions containing a higher proportion of high-population states while others have low-population states. For example, the Midwest and Southeast have more states in the high population category, whereas regions such as New England and Central Plains have more states classified as low population.
+
+# Step 6: Use `stat_summary` to examine mean vaccination rate and death rate by region with standard deviation error bars
+
+```{r}
+# Vaccination rates
+p6_vax <- ggplot(state_avg_data, aes(x = region_name, y = mean_series)) +
+  stat_summary(fun.data = "mean_sdl", geom = "bar", fill = "steelblue") +
+  stat_summary(fun.data = "mean_sdl", geom = "errorbar", width = 0.2) +
+  labs(
+    title = "Mean Vaccination Rate by Region with Standard Deviation",
+    x = "Region",
+    y = "Mean Vaccination Rate per 100,000 Population"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p6_vax)
+ggsave("step6_vaccination.png", width = 10, height = 6)
+
+```
+
+Mean vaccination rates were almost similar across regions, with slightly higher averages in New England and lower averages in the Southeast. The standard deviations are also large which may mean that there were significant within-region variability in vaccination uptake among states.
+
+By death rates
+
+```{r}
+# Death rates
+p6_death <- ggplot(state_avg_data, aes(x = region_name, y = mean_deaths)) +
+  stat_summary(fun.data = "mean_sdl", geom = "bar", fill = "coral") +
+  stat_summary(fun.data = "mean_sdl", geom = "errorbar", width = 0.2) +
+  labs(
+    title = "Mean Death Rate by Region with Standard Deviation",
+    x = "Region",
+    y = "Mean Death Rate per 100,000 Population"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p6_death)
+ggsave("step6_deaths.png", width = 10, height = 6)
+```
+
+# Step 7: Make a map showing the spatial trend in COVID deaths in the US.
+
+```{r}
+us_states <- map_data("state")
+
+cat("Map data state names (first 10):\n")
+print(head(unique(us_states$region), 10))
+
+unique(state_avg_data$state)
+
+```
+
+Merge map_data to COVID data frame
+
+```{r}
+# Convert abbreviations to full names
+state_lookup <- data.frame(
+  state = state.abb,
+  region_map = tolower(state.name))
+state_lookup <- rbind(
+  state_lookup,
+  data.frame(state = "DC", region_map = "district of columbia"))
+
+state_map_data <- state_avg_data %>%
+  left_join(state_lookup, by = "state")
+
+# Merge with map data
+map_covid <- left_join(us_states, state_map_data, by = c("region" = "region_map"))
+
+```
+
+Identify the 10 states with the highest death rates
+
+```{r}
+
+top10_states <- state_map_data %>%
+  arrange(desc(mean_deaths)) %>%
+  head(10)
+
+cat("\nTop 10 states by death rate:\n")
+print(top10_states %>% select(state, region_map, mean_deaths))
+```
+
+The map with spatial trends in COVID-19 within the US
+
+```{r}
+state_centroids <- map_covid %>%
+  filter(region %in% top10_states$region_map) %>%
+  group_by(region) %>%
+  summarise(
+    long = mean(long, na.rm = TRUE),
+    lat = mean(lat, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Add state abbreviations to centroids for labeling
+state_centroids <- state_centroids %>%
+  left_join(state_map_data %>% select(region_map, state), by = c("region" = "region_map"))
+
+p7 <- ggplot(map_covid, aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = mean_deaths), color = "white", size = 0.2) +
+  geom_point(
+    data = state_centroids,
+    aes(x = long, y = lat),
+    inherit.aes = FALSE,
+    shape = 8,
+    size = 4,
+    color = "black"
+  ) +
+  geom_text(
+    data = state_centroids,
+    aes(x = long, y = lat, label = state),
+    inherit.aes = FALSE,
+    size = 3.5,
+    fontface = "bold",
+    color = "black",
+    nudge_y = 1
+  ) +
+  scale_fill_gradientn(
+    colors = c("#fee5d9", "#fcae91", "#fb6a4a", "#de2d26", "#a50f15"),
+    name = "Mean Deaths\nper 100,000\nPopulation",
+    na.value = "grey90"
+  ) +
+  coord_fixed(1.3) +
+  labs(
+    title = "Mean COVID-19 Death Rates by State",
+    subtitle = "* indicates top 10 states with highest death rates"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 11),
+    legend.position = "right",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9)
+  )
+
+print(p7)
+ggsave("step7_map.png", plot = p7, width = 12, height = 8, dpi = 300)
+```
+
+The map shows that COVID-19 death rates followed a geographic pattern, with the highest mortality in the Southern and Southwestern states.
+
+# Step 8: Use a ggplot extension
+
+```{r}
+p8 <- ggplot(state_avg_data, aes(x = mean_series, y = mean_deaths)) +
+  geom_mark_ellipse(aes(fill = region_name, color = region_name),
+                    alpha = 0.08,
+                    expand = unit(2, "mm"),
+                    show.legend = FALSE) +
+  geom_point(aes(color = region_name, size = pop), alpha = 0.8) +
+  scale_size_continuous(range = c(3, 12), name = "Population") +
+  scale_color_viridis_d(option = "plasma", name = "Region") +
+  scale_fill_viridis_d(option = "plasma") +
+  labs(
+    title = "Vaccination Rates vs Death Rates: Regional Patterns",
+    subtitle = "Using ggforce - Ellipses show regional clustering, point size = population",
+    x = "Mean Vaccination Rate per 100,000 Population",
+    y = "Mean Death Rate per 100,000 Population"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5, margin = margin(b = 10)),
+    legend.position = "right",
+    panel.grid.minor = element_blank()
+  )
+
+print(p8)
+ggsave("step8_ggforce.png", plot = p8, width = 13, height = 8, dpi = 300)
+
+```
