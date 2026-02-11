@@ -1,0 +1,833 @@
+---
+title: "Homework 1"
+author: "Faith Okaalo"
+date: 02/09/2026
+format: 
+  html:
+    embed-resources: true
+    code-fold: false
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+editor: visual
+---
+
+## Quarto
+
+# Step 1: Data loading and initial exploration
+
+This report examines whether daily concentrations of PM2.5 (particulate matter air pollution with aerodynamic diameter less than 2.5 micrometers) decreased in Michigan over the 20 years spanning from 2005 to 2025. (20 points) Given the formulated question from the assignment description, you will now conduct EDA Checklist items 1-5. First, download 2005 and 2025 PM2.5 data for all sites in Michigan from the [EPA Air Quality Data website](https://www.epa.gov/outdoor-air-quality-data/download-daily-data), then read the data into R. For each of the two datasets, check the dimensions, headers, footers, variable names, and variable types. Check the distribution of the key variable we are analyzing (PM). Write up a summary of all of your findings.
+
+```{r setup, message=FALSE, warning=FALSE}
+# Load libraries
+library(tidyverse)
+library(lubridate)
+library(leaflet)
+library(knitr)
+library(scales)
+
+# Set theme for plots
+theme_set(theme_minimal())
+```
+
+Read in the two data sets
+
+```{r}
+# Read 2005 data
+pm2005 <- read_csv("C:/Users/faith/Downloads/ad_viz_plotval_data2005.csv", 
+                    show_col_types = FALSE)
+
+# Read 2025 data
+pm2025 <- read_csv("C:/Users/faith/Downloads/ad_viz_plotval_data2025.csv", 
+                    show_col_types = FALSE)
+```
+
+**Exploratory checklist 1-5: The 2005 data set**
+
+**Dimensions**
+
+```{r}
+dim(pm2005)
+cat("The 2005 dataset has", nrow(pm2005), "rows and", ncol(pm2005), "columns.\n")
+```
+
+**Headers**
+
+```{r}
+# Check first few rows
+head(pm2005) %>% kable()
+```
+
+**Footers**
+
+```{r}
+# Check last few rows
+tail(pm2005) %>% kable()
+```
+
+**Variable names and types**
+
+```{r}
+# Check structure
+str(pm2005)
+```
+
+```{r}
+# Summary of variable types
+cat("\nVariable types:\n")
+sapply(pm2005, class) %>% 
+  as.data.frame() %>% 
+  rownames_to_column("Variable") %>%
+  rename(Type = ".") %>%
+  kable()
+```
+
+**Distribution of key variable (PM2.5)**
+
+```{r}
+# Summary statistics for PM2.5
+summary(pm2005$`Daily Mean PM2.5 Concentration`)
+
+# Visualize distribution
+ggplot(pm2005, aes(x = `Daily Mean PM2.5 Concentration`)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Daily Mean PM2.5 Concentration in 2005",
+       x = "PM2.5 Concentration (μg/m³)",
+       y = "Frequency") +
+  theme_minimal()
+
+# Boxplot
+ggplot(pm2005, aes(y = `Daily Mean PM2.5 Concentration`)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.7) +
+  labs(title = "Boxplot of Daily Mean PM2.5 Concentration in 2005",
+       y = "PM2.5 Concentration (μg/m³)") +
+  theme_minimal()
+```
+
+**Key observations for the 2005 dataset**
+
+The 2005 dataset contains 5,280 observations and 22 variables, representing daily PM2.5 measurements from Michigan monitoring sites throughout the year. The data overall looks great with consistent structure from headers through footers, and no missing PM2.5 values were detected.
+
+PM2.5 Distribution: The key variable shows a mean concentration of 13.77 μg/m³ and a median of 11.00 μg/m³, with values ranging from 0.0 to 81.6 μg/m³. The distribution is right-skewed, with most observations concentrated between 5-15 μg/m³ and a long tail extending toward higher values. The boxplot shows many outliers above the upper quartile.
+
+**Exploratory checklist 1-5: The 2025 data set**
+
+**Dimensions**
+
+```{r}
+# Check dimensions
+dim(pm2025)
+cat("The 2025 dataset has", nrow(pm2025), "rows and", ncol(pm2025), "columns.\n")
+```
+
+**Headers**
+
+```{r}
+# Check first few rows
+head(pm2025) %>% kable()
+```
+
+**Footers**
+
+```{r}
+# Check last few rows
+tail(pm2025) %>% kable()
+```
+
+**Variable names and types**
+
+```{r}
+# Check structure
+str(pm2025)
+
+# Summary of variable types
+cat("\nVariable types:\n")
+sapply(pm2025, class) %>% 
+  as.data.frame() %>% 
+  rownames_to_column("Variable") %>%
+  rename(Type = ".") %>%
+  kable()
+
+```
+
+**Distribution of key variable (PM2.5)**
+
+```{r}
+# Summary statistics for PM2.5
+summary(pm2025$`Daily Mean PM2.5 Concentration`)
+
+# Visualize distribution
+ggplot(pm2025, aes(x = `Daily Mean PM2.5 Concentration`)) +
+  geom_histogram(bins = 50, fill = "coral", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Daily Mean PM2.5 Concentration in 2025",
+       x = "PM2.5 Concentration (μg/m³)",
+       y = "Frequency") +
+  theme_minimal()
+
+# Boxplot
+ggplot(pm2025, aes(y = `Daily Mean PM2.5 Concentration`)) +
+  geom_boxplot(fill = "coral", alpha = 0.7) +
+  labs(title = "Boxplot of Daily Mean PM2.5 Concentration in 2025",
+       y = "PM2.5 Concentration (μg/m³)") +
+  theme_minimal()
+```
+
+**Key observations for the 2025 dataset.**
+
+The 2025 dataset has 9,934 observations and 22 variables. The first few rows of the 2025 dataset show complete, properly formatted data starting on 01/01/2025, with all 22 columns correctly labeled. The header row contains descriptive variable names identical to those in the 2005 dataset. The footers also show that the data is formatted correctly. Unlike some observations in the 2005 dataset, the Local Site Name field appears consistently populated throughout, including in the footer records. All 22 variables have been appropriately saved, with numeric variables (PM2.5 concentration, Site ID, coordinates, method codes) correctly identified as numeric, and text variables (site names, descriptions, county, state) properly stored as character.
+
+The distribution of PM2.5 concentrations in 2025 shows improvement compared to 2005. The key variable shows a mean concentration of 8.3 μg/m³ and a median of 6.3 μg/m³, with a range of 0.0 to 116 μg/m³. While the distribution remains slightly right-skewed, indicating occasional high-pollution events (with at least one extreme outlier exceeding 100 μg/m³), the overall pattern demonstrates substantially improved air quality.
+
+Comparing the two years, there appears to be a notable decrease in PM2.5 concentrations from 2005 to 2025. The mean concentration decreased from approximately 13.77 μg/m³ in 2005 to 8.30 μg/m³ in 2025, suggesting improved air quality over the 20-year period.
+
+# Step 2: Combine Datasets and Create Year Identifier.
+
+(10 points) Combine the two years of data into one data frame. Use the `Date` variable to create a new column for year, which will serve as an identifier. Change the names of the key variables so that they are easier to refer to in your code
+
+```{r}
+# Add year column to each dataset
+pm2005 <- pm2005 %>%
+  mutate(year = year(mdy(Date)))
+
+pm2025 <- pm2025 %>%
+  mutate(year = year(mdy(Date)))
+
+# Combine the datasets
+pm_combined <- bind_rows(pm2005, pm2025)
+
+# Rename key variables for easier reference
+pm_combined <- pm_combined %>%
+  rename(
+    pm25 = `Daily Mean PM2.5 Concentration`,
+    site_id = `Site ID`,
+    site_name = `Local Site Name`,
+    latitude = `Site Latitude`,
+    longitude = `Site Longitude`,
+    county = County,
+    method_code = `Method Code`,
+    method_desc = `Method Description`,
+    date = Date
+  )
+
+# Check the combined dataset
+cat("Combined dataset dimensions:", dim(pm_combined)[1], "rows x", 
+    dim(pm_combined)[2], "columns\n")
+
+# Verify year distribution
+table(pm_combined$year) %>% 
+  as.data.frame() %>%
+  rename(Year = Var1, Count = Freq) %>%
+  kable(caption = "Observation counts by year")
+```
+
+# Step 3: Spatial Distribution of Monitoring Sites.
+
+Create a basic map (or maps) in either `leaflet` or `ggplot` showing the locations of the monitoring sites, using different colors for each year. Summarize the spatial distribution of the sites. Does this distribution change from 2005 to 2025?
+
+```{r map-sites, fig.height=6, fig.width=10}
+# Get unique site locations for each year
+sites_by_year <- pm_combined %>%
+  select(site_id, site_name, latitude, longitude, county, year) %>%
+  distinct()
+
+# Create color palette for years
+color_pal <- colorFactor(palette = c("blue", "red"), 
+                         domain = c(2005, 2025))
+
+# Create leaflet map
+leaflet(sites_by_year) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng = ~longitude,
+    lat = ~latitude,
+    color = ~color_pal(year),
+    fillOpacity = 0.7,
+    radius = 6,
+    popup = ~paste0(
+      "<b>Site:</b> ", site_name, "<br>",
+      "<b>County:</b> ", county, "<br>",
+      "<b>Year:</b> ", year, "<br>",
+      "<b>Site ID:</b> ", site_id
+    ),
+    label = ~site_name
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = color_pal,
+    values = ~year,
+    title = "Year",
+    opacity = 1
+  ) %>%
+  setView(lng = -85.0, lat = 44.5, zoom = 6)
+```
+
+```{r ggplot-map, fig.height=8, fig.width=10}
+# Get Michigan boundary (approximate)
+ggplot(sites_by_year, aes(x = longitude, y = latitude, color = factor(year))) +
+  geom_point(size = 3, alpha = 0.7) +
+  scale_color_manual(values = c("2005" = "blue", "2025" = "red"),
+                     name = "Year") +
+  labs(
+    title = "PM2.5 Monitoring Sites in Michigan: 2005 vs 2025",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  coord_fixed(ratio = 1.3)
+```
+
+**Spartial distribution.**
+
+```{r}
+# Count sites per year
+sites_summary <- sites_by_year %>%
+  group_by(year) %>%
+  summarize(
+    n_sites = n_distinct(site_id),
+    n_counties = n_distinct(county)
+  )
+
+sites_summary %>% kable(caption = "Number of monitoring sites by year")
+
+# Sites present in both years
+sites_both_years <- sites_by_year %>%
+  group_by(site_id) %>%
+  summarize(n_years = n_distinct(year)) %>%
+  filter(n_years == 2)
+
+cat("\nNumber of sites present in both years:", nrow(sites_both_years), "\n")
+
+# County coverage
+county_comparison <- sites_by_year %>%
+  select(county, year) %>%
+  distinct() %>%
+  pivot_wider(names_from = year, values_from = year, 
+              values_fn = length, values_fill = 0) %>%
+  rename(Year_2005 = `2005`, Year_2025 = `2025`)
+
+cat("\nCounty coverage comparison:\n")
+county_comparison %>% kable()
+
+```
+
+The maps show that PM2.5 monitoring sites in both 2005 and 2025 were mostly in Southern Michigan, with Northern Michigan and the Upper Peninsula having relatively few monitoring sites in both years. When we compare the two years, the overall spatial pattern looks similar, though the number and coverage of the monitoring sites decrease with time. In 2005 there were 34 sites across 22 counties, while in 2025 there were 27 sites across 18 counties. 17 sites were present in both years, however several counties had sites only in 2005 and a small number gained sites in 2025. The distribution did not shift geographically.
+
+# Step 4: Data Quality Checks.
+
+Check for any data issues, such as missing or implausible values of PM in the combined dataset. Let’s look more closely at the methods used for data collection. Look at the distribution of the method code variable. Examine the two most common method codes in the [EPA PM2.5 Codetable](https://aqs.epa.gov/aqsweb/documents/codetables/methods_speciation.html), and describe your findings. Calculate the proportion of missing values and method code for each year and report any temporal patterns you see in these observations. Why might these temporal patterns matter?
+
+**Missing values**
+
+```{r}
+# Missing PM2.5 values by year
+missing_summary <- pm_combined %>%
+  group_by(year) %>%
+  summarize(
+    total_obs = n(),
+    missing_pm25 = sum(is.na(pm25)),
+    prop_missing = round(missing_pm25 / total_obs * 100, 2),
+    .groups = "drop"
+  )
+
+missing_summary %>%
+  kable(caption = "Missing PM2.5 values by year")
+
+# 2) Visualize missing data patterns (only if there are missing values)
+missing_by_site <- pm_combined %>%
+  group_by(year, site_id) %>%
+  summarize(
+    total = n(),
+    missing = sum(is.na(pm25)),
+    .groups = "drop"
+  )
+
+if (nrow(filter(missing_by_site, missing > 0)) == 0) {
+  cat("No missing PM2.5 values detected, so the missingness-by-site plot was not produced.\n")
+} else {
+  missing_by_site %>%
+    filter(missing > 0) %>%
+    ggplot(aes(x = reorder(site_id, missing), y = missing, fill = factor(year))) +
+    geom_col() +
+    facet_wrap(~year, scales = "free_x") +
+    labs(
+      title = "Missing PM2.5 Values by Site",
+      x = "Site ID",
+      y = "Number of Missing Values",
+      fill = "Year"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+```
+
+There were no missing values for PM2.5 for both years.
+
+**Implausible values**
+
+```{r}
+# Negative values (implausible)
+negative_vals <- pm_combined %>%
+  filter(!is.na(pm25), pm25 < 0)
+
+cat("Number of negative PM2.5 values:", nrow(negative_vals), "\n\n")
+
+# Extremely high values
+high_vals_100 <- pm_combined %>%
+  filter(!is.na(pm25), pm25 > 100)
+
+high_vals_500 <- pm_combined %>%
+  filter(!is.na(pm25), pm25 > 500)
+
+cat("Number of PM2.5 values above 100 μg/m³:", nrow(high_vals_100), "\n")
+cat("Number of PM2.5 values above 500 μg/m³:", nrow(high_vals_500), "\n\n")
+
+if (nrow(high_vals_100) > 0) {
+  cat("Top 10 PM2.5 values above 100 μg/m³:\n")
+  print(
+    high_vals_100 %>%
+      select(date, year, site_name, county, pm25) %>%
+      arrange(desc(pm25)) %>%
+      head(10) %>%
+      kable()
+  )
+}
+
+# Statistical outliers: values beyond 3 SD within each year 
+outlier_summary <- pm_combined %>%
+  group_by(year) %>%
+  mutate(
+    mean_pm25 = mean(pm25, na.rm = TRUE),
+    sd_pm25   = sd(pm25, na.rm = TRUE),
+    z_score   = ifelse(sd_pm25 > 0, abs((pm25 - mean_pm25) / sd_pm25), NA_real_),
+    outlier   = z_score > 3
+  ) %>%
+  summarize(
+    n_outliers = sum(outlier, na.rm = TRUE),
+    prop_outliers = round(n_outliers / n() * 100, 2),
+    .groups = "drop"
+  )
+
+outlier_summary %>%
+  kable(caption = "Statistical outliers (beyond 3 SD) by year")
+```
+
+There were no negative PM2.5 values in the dataset. Only two observations exceeded 100 µg/m³, both occurring in 2025 at the same monitoring site in Marquette County, and no values exceeded 500 µg/m³. A small proportion of observations were identified as outliers, exceeding three standard deviations from the mean in both years (1.7% in 2005 and 2.3% in 2025).
+
+**Method code analysis.**
+
+```{r}
+# Distribution of method_code by year
+method_dist <- pm_combined %>%
+  count(year, method_code, method_desc, name = "n") %>%
+  arrange(year, desc(n))
+
+method_dist %>%
+  kable(caption = "Distribution of PM2.5 method codes by year")
+
+# visualization of the main methods
+pm_combined %>%
+  count(year, method_code, name = "n") %>%
+  ggplot(aes(x = factor(method_code), y = n, fill = factor(year))) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Method code distribution by year",
+    x = "Method code",
+    y = "Number of observations",
+    fill = "Year"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Two most common method codes overall
+top2_methods <- pm_combined %>%
+  count(method_code, method_desc, sort = TRUE) %>%
+  slice_head(n = 2)
+
+top2_methods %>%
+  kable(caption = "Two most common PM2.5 method codes (overall)")
+
+# Proportion missing pm25 and method_code by year
+missing_by_year <- pm_combined %>%
+  group_by(year) %>%
+  summarize(
+    n_total = n(),
+    pm25_missing_n = sum(is.na(pm25)),
+    pm25_missing_prop = round(pm25_missing_n / n_total, 4),
+    method_missing_n = sum(is.na(method_code) | method_code == ""),
+    method_missing_prop = round(method_missing_n / n_total, 4),
+    .groups = "drop"
+  )
+
+missing_by_year %>%
+  kable(caption = "Proportion missing PM2.5 and method_code by year")
+```
+
+PM2.5 measurement methods differed across years. In 2005, measurements were primarily collected using 118 (R & P Model 2025 PM2.5 Sequential w/WINS. In 2025, method 636 (Teledyne T640) accounted for a large share of observations. While PM2.5 values were complete in both years, method code documentation was missing for approximately 25.6% of observations in 2025, whereas no method codes were missing in 2005. These temporal differences in measurement methods and documentation may affect comparability across years and should be considered when interpreting trends in PM2.5 concentrations.
+
+# Step 5: Multi-level analysis.
+
+**Level 1: State analysis**
+
+```{r}
+# Calculate statewide statistics by year
+state_summary <- pm_combined %>%
+  group_by(year) %>%
+  summarize(
+    n_obs = n(),
+    mean_pm25 = mean(pm25, na.rm = TRUE),
+    median_pm25 = median(pm25, na.rm = TRUE),
+    sd_pm25 = sd(pm25, na.rm = TRUE),
+    min_pm25 = min(pm25, na.rm = TRUE),
+    max_pm25 = max(pm25, na.rm = TRUE),
+    q25 = quantile(pm25, 0.25, na.rm = TRUE),
+    q75 = quantile(pm25, 0.75, na.rm = TRUE)
+  )
+
+cat("Statewide PM2.5 Summary Statistics:\n")
+state_summary %>% 
+  mutate(across(where(is.numeric) & !year, ~round(., 2))) %>%
+  kable()
+
+# Calculate percent change
+pct_change_mean <- ((state_summary$mean_pm25[2] - state_summary$mean_pm25[1]) / 
+                    state_summary$mean_pm25[1]) * 100
+pct_change_median <- ((state_summary$median_pm25[2] - state_summary$median_pm25[1]) / 
+                      state_summary$median_pm25[1]) * 100
+
+cat("\nPercent change in mean PM2.5 from 2005 to 2025:", 
+    round(pct_change_mean, 1), "%\n")
+cat("Percent change in median PM2.5 from 2005 to 2025:", 
+    round(pct_change_median, 1), "%\n")
+```
+
+**State visualizations**
+
+```{r state-viz, fig.height=6, fig.width=10}
+# Side-by-side boxplots
+ggplot(pm_combined, aes(x = factor(year), y = pm25, fill = factor(year))) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  labs(
+    title = "Michigan Statewide PM2.5 Concentrations: 2005 vs 2025",
+    x = "Year",
+    y = "PM2.5 Concentration (μg/m³)",
+    fill = "Year"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Violin plots
+ggplot(pm_combined, aes(x = factor(year), y = pm25, fill = factor(year))) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.2, alpha = 0.5, outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  labs(
+    title = "Distribution of PM2.5 Concentrations in Michigan",
+    x = "Year",
+    y = "PM2.5 Concentration (μg/m³)",
+    fill = "Year"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Overlapping histograms
+ggplot(pm_combined, aes(x = pm25, fill = factor(year))) +
+  geom_histogram(alpha = 0.5, bins = 50, position = "identity") +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  labs(
+    title = "Overlapping Distributions of PM2.5 Concentrations",
+    x = "PM2.5 Concentration (μg/m³)",
+    y = "Frequency",
+    fill = "Year"
+  ) +
+  theme_minimal()
+
+# Cumulative distribution
+ggplot(pm_combined, aes(x = pm25, color = factor(year))) +
+  stat_ecdf(linewidth = 1) +
+  scale_color_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  labs(
+    title = "Cumulative Distribution of PM2.5 Concentrations",
+    x = "PM2.5 Concentration (μg/m³)",
+    y = "Cumulative Probability",
+    color = "Year"
+  ) +
+  theme_minimal()
+```
+
+Statewide PM2.5 concentrations declined between 2005 and 2025. The mean daily concentration decreased from 13.77 µg/m³ in 2005 to 8.30 µg/m³ in 2025, representing a 39.7% reduction. The median declined from 11.0 µg/m³ to 6.3 µg/m³, a 42.7% reduction. The boxplots and violin plots show a clear downward shift in the distribution of PM2.5 concentrations in 2025 compared to 2005. The 2025 distribution is more concentrated at lower values, with a smaller spread which may mean lower average pollution and reduced variability statewide. However, extreme high values remain present in both years. The maximum value in 2025 (116.0 µg/m³) exceeds that of 2005 (81.6 µg/m³), indicating that while overall air quality improved, a few high-pollution events still occurred. The overlapping histograms further confirm that many of the days in 2025 had lower PM2.5 concentrations.
+
+**Level 2: County. Examine the primary question for every county in Michigan.**
+
+```{r}
+# Calculate county-level statistics
+county_summary <- pm_combined %>%
+  group_by(county, year) %>%
+  summarize(
+    n_obs = n(),
+    mean_pm25 = mean(pm25, na.rm = TRUE),
+    median_pm25 = median(pm25, na.rm = TRUE),
+    sd_pm25 = sd(pm25, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = year,
+    values_from = c(n_obs, mean_pm25, median_pm25, sd_pm25),
+    names_sep = "_"
+  ) %>%
+  mutate(
+    change_mean = mean_pm25_2025 - mean_pm25_2005,
+    pct_change_mean = round((change_mean / mean_pm25_2005) * 100, 1)
+  )
+
+cat("County-Level PM2.5 Summary:\n")
+county_summary %>%
+  select(county, mean_pm25_2005, mean_pm25_2025, change_mean, pct_change_mean) %>%
+  arrange(desc(abs(pct_change_mean))) %>%
+  mutate(across(where(is.numeric), ~round(., 2))) %>%
+  kable()
+```
+
+**County level visualization**
+
+```{r county-viz, fig.height=8, fig.width=10}
+# Bar chart of mean PM2.5 by county
+pm_combined %>%
+  group_by(county, year) %>%
+  summarize(mean_pm25 = mean(pm25, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = reorder(county, mean_pm25), y = mean_pm25, fill = factor(year))) +
+  geom_col(position = "dodge", alpha = 0.8) +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  coord_flip() +
+  labs(
+    title = "Mean PM2.5 Concentrations by County: 2005 vs 2025",
+    x = "County",
+    y = "Mean PM2.5 Concentration (μg/m³)",
+    fill = "Year"
+  ) +
+  theme_minimal()
+
+# Line plot showing change for each county
+county_summary %>%
+  filter(!is.na(mean_pm25_2005) & !is.na(mean_pm25_2025)) %>%
+  pivot_longer(
+    cols = c(mean_pm25_2005, mean_pm25_2025),
+    names_to = "year",
+    values_to = "mean_pm25"
+  ) %>%
+  mutate(year = as.numeric(str_extract(year, "\\d{4}"))) %>%
+  ggplot(aes(x = year, y = mean_pm25, group = county, color = county)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  labs(
+    title = "Change in Mean PM2.5 by County: 2005 to 2025",
+    x = "Year",
+    y = "Mean PM2.5 Concentration (μg/m³)",
+    color = "County"
+  ) +
+  theme_minimal()
+
+# Boxplot by county and year
+pm_combined %>%
+  ggplot(aes(x = county, y = pm25, fill = factor(year))) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  coord_flip() +
+  labs(
+    title = "Distribution of PM2.5 Concentrations by County",
+    x = "County",
+    y = "PM2.5 Concentration (μg/m³)",
+    fill = "Year"
+  ) +
+  theme_minimal()
+```
+
+**Spatial plot for the county level analysis**
+
+```{r county-spatial, fig.height=8, fig.width=10}
+# Calculate county means with spatial info
+county_spatial <- pm_combined %>%
+  group_by(county, year, latitude, longitude) %>%
+  summarize(mean_pm25 = mean(pm25, na.rm = TRUE), .groups = "drop") %>%
+  group_by(county, year) %>%
+  summarize(
+    mean_pm25 = mean(mean_pm25),
+    latitude = mean(latitude),
+    longitude = mean(longitude),
+    .groups = "drop"
+  )
+
+# Create faceted spatial plot
+ggplot(county_spatial, aes(x = longitude, y = latitude, 
+                           size = mean_pm25, color = mean_pm25)) +
+  geom_point(alpha = 0.7) +
+  scale_color_gradient(low = "green", high = "red",
+                       name = "Mean PM2.5\n(μg/m³)") +
+  scale_size_continuous(range = c(3, 12), name = "Mean PM2.5\n(μg/m³)") +
+  facet_wrap(~year) +
+  labs(
+    title = "Spatial Distribution of County-Level Mean PM2.5",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal() +
+  coord_fixed(ratio = 1.3)
+
+```
+
+At the county level, mean PM2.5 concentrations declined substantially between 2005 and 2025 across nearly all Michigan counties. Most counties experienced reductions of approximately 40–60%. Some counties only had data for one year, limiting the ability to assess trends in those areas. Spatial patterns indicate that while overall air quality improved statewide, southern Michigan counties continued to exhibit relatively higher PM2.5 concentrations compared to northern regions.
+
+**Level 3: City. Restrict the data to sites in Wayne county and examine the primary question for every site.**
+
+```{r site-level}
+# Filter for Wayne County only
+wayne_data <- pm_combined %>%
+  filter(county == "Wayne")
+
+# Check which sites we have
+wayne_sites <- wayne_data %>%
+  select(site_id, site_name, year) %>%
+  distinct() %>%
+  arrange(site_id, year)
+
+cat("Wayne County monitoring sites:\n")
+wayne_sites %>% kable()
+
+# Calculate site-level statistics
+site_summary <- wayne_data %>%
+  group_by(site_id, site_name, year) %>%
+  summarize(
+    n_obs = n(),
+    mean_pm25 = mean(pm25, na.rm = TRUE),
+    median_pm25 = median(pm25, na.rm = TRUE),
+    sd_pm25 = sd(pm25, na.rm = TRUE),
+    min_pm25 = min(pm25, na.rm = TRUE),
+    max_pm25 = max(pm25, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cat("\nWayne County Site-Level Summary:\n")
+site_summary %>%
+  mutate(across(where(is.numeric) & !year, ~round(., 2))) %>%
+  kable()
+```
+
+**Visualizations (Wayne County)**
+
+```{r site-viz, fig.height=8, fig.width=10}
+# Boxplot by site
+ggplot(wayne_data, aes(x = site_name, y = pm25, fill = factor(year))) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  coord_flip() +
+  labs(
+    title = "PM2.5 Distributions by Site in Wayne County",
+    x = "Monitoring Site",
+    y = "PM2.5 Concentration (μg/m³)",
+    fill = "Year"
+  ) +
+  theme_minimal()
+
+# Line plot showing change by site
+site_summary %>%
+  filter(!is.na(mean_pm25)) %>%
+  ggplot(aes(x = year, y = mean_pm25, color = site_name, group = site_id)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 4) +
+  labs(
+    title = "Change in Mean PM2.5 by Site in Wayne County: 2005 to 2025",
+    x = "Year",
+    y = "Mean PM2.5 Concentration (μg/m³)",
+    color = "Site"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Violin plots by site
+ggplot(wayne_data, aes(x = site_name, y = pm25, fill = factor(year))) +
+  geom_violin(alpha = 0.7) +
+  geom_boxplot(width = 0.1, alpha = 0.5, outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  coord_flip() +
+  labs(
+    title = "Distribution Comparison by Site in Wayne County",
+    x = "Monitoring Site",
+    y = "PM2.5 Concentration (μg/m³)",
+    fill = "Year"
+  ) +
+  theme_minimal()
+
+# Faceted histograms
+ggplot(wayne_data, aes(x = pm25, fill = factor(year))) +
+  geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
+  scale_fill_manual(values = c("2005" = "steelblue", "2025" = "coral")) +
+  facet_wrap(~site_name, scales = "free_y") +
+  labs(
+    title = "PM2.5 Distribution by Site in Wayne County",
+    x = "PM2.5 Concentration (μg/m³)",
+    y = "Frequency",
+    fill = "Year"
+  ) +
+  theme_minimal()
+```
+
+**Spatial plot for Wyane County**
+
+```{r wayne-spatial, fig.height=6, fig.width=10}
+# Get site locations and mean PM2.5
+wayne_spatial <- wayne_data %>%
+  group_by(site_id, site_name, year, latitude, longitude) %>%
+  summarize(mean_pm25 = mean(pm25, na.rm = TRUE), .groups = "drop")
+
+# Create spatial plot
+ggplot(wayne_spatial, aes(x = longitude, y = latitude, 
+                          size = mean_pm25, color = mean_pm25)) +
+  geom_point(alpha = 0.7) +
+  geom_text(aes(label = site_id), hjust = -0.3, size = 3, show.legend = FALSE) +
+  scale_color_gradient(low = "green", high = "red",
+                       name = "Mean PM2.5\n(μg/m³)") +
+  scale_size_continuous(range = c(4, 12), name = "Mean PM2.5\n(μg/m³)") +
+  facet_wrap(~year) +
+  labs(
+    title = "Spatial Distribution of PM2.5 at Wayne County Sites",
+    x = "Longitude",
+    y = "Latitude",
+    subtitle = "Point size and color indicate mean PM2.5 concentration"
+  ) +
+  theme_minimal() +
+  coord_fixed(ratio = 1)
+
+# Interactive map of Wayne County sites
+wayne_sites_map <- wayne_spatial %>%
+  select(site_id, site_name, latitude, longitude, year, mean_pm25) %>%
+  distinct()
+
+leaflet(wayne_sites_map) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng = ~longitude,
+    lat = ~latitude,
+    color = ~ifelse(year == 2005, "blue", "red"),
+    fillOpacity = 0.7,
+    radius = ~mean_pm25 * 0.5,
+    popup = ~paste0(
+      "<b>Site:</b> ", site_name, "<br>",
+      "<b>Site ID:</b> ", site_id, "<br>",
+      "<b>Year:</b> ", year, "<br>",
+      "<b>Mean PM2.5:</b> ", round(mean_pm25, 2), " μg/m³"
+    ),
+    label = ~paste0(site_name, " (", year, ")")
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    colors = c("blue", "red"),
+    labels = c("2005", "2025"),
+    title = "Year",
+    opacity = 1
+  ) %>%
+  setView(lng = mean(wayne_sites_map$longitude), 
+          lat = mean(wayne_sites_map$latitude), 
+          zoom = 10)
+```
+
+At the city level, analysis of Wayne County monitoring sites shows a clear and consistent decline in PM2.5 concentrations from 2005 to 2025 across all locations. In 2005, most sites had mean concentrations ranging from roughly 14–19 μg/m³, with wide distributions and multiple high-value outliers, indicating frequent elevated pollution days and substantial variability. By 2025, distributions shifted noticeably left, with most site-level means falling between approximately 7–11 μg/m³ and fewer extreme values, suggesting both lower overall exposure and stability in air quality. The spatial plots further demonstrate that higher concentrations in 2005 were near Detroit and surrounding areas, whereas in 2025, values are uniformly lower across sites.
