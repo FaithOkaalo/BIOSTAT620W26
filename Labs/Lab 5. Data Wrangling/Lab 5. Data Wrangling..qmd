@@ -1,0 +1,202 @@
+---
+title: "LAB 5. DATA WRANGLING"
+author: "Faith Okaalo"
+date: 02/12/2026
+format: 
+  html:
+    embed-resources: true
+    code-fold: false
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+editor: visual
+---
+
+### Step 1: Load libraries
+
+```{r}
+# Load required packages
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(janitor)
+library(jsonlite)
+library(httr2)
+library(lubridate)
+```
+
+### Step 2: Read in the data
+
+```{r}
+url <- 'https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/covid/population.csv'
+if (!file.exists("population.csv"))
+  download.file(
+    url = url,
+    destfile = "population.csv",
+    method   = "libcurl",
+    timeout  = 60
+  )
+population <- read.csv('population.csv')
+```
+
+Print the first few rows
+
+```{r}
+print(head(population))
+```
+
+### Step 3: Examine the population matrix
+
+```{r}
+# Use janitor to make first row the header
+population <- population %>%
+  row_to_names(row_number = 1)
+```
+
+```{r}
+names(population)
+print(head(population))
+```
+
+```{r}
+# Remove unnecessary columns (index and state ID)
+population <- population %>%
+  select(-1, -state)
+```
+
+```{r}
+# Rename state column
+population <- population %>%
+  rename(state_name = NAME)
+```
+
+```{r}
+# Convert POP_2020 and POP_2021 columns to numeric because they are saved as characters
+population <- population %>%
+  mutate(
+    POP_2020 = as.numeric(POP_2020),
+    POP_2021 = as.numeric(POP_2021)
+  )
+```
+
+```{r}
+# Add state abbreviations
+state_lookup <- c(
+  setNames(state.abb, state.name),
+  "District of Columbia" = "DC",
+  "Puerto Rico" = "PR")
+```
+
+```{r}
+population <- population %>%
+  mutate(state = state_lookup[state_name])
+
+# Print first few rows
+head(population)
+```
+
+```{r}
+# Convert to tidy format
+population <- population %>%
+  pivot_longer(
+    cols = starts_with("POP_"),
+    names_to = "year",
+    values_to = "population"
+  ) %>%
+  mutate(year = as.integer(gsub("POP_", "", year)))
+
+# Print first few rows
+head(population)
+```
+
+### Step 4: Load regions data
+
+```{r}
+url <- "https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/covid/regions.json"
+regions <- fromJSON(url)
+```
+
+```{r}
+# Split states into separate rows using unnest
+regions <- regions %>%
+  unnest(states) %>%
+  rename(state_name = states)
+```
+
+```{r}
+# Make region a factor
+regions <- regions %>%
+  mutate(region = as.character(region)) %>%
+  mutate(region = as.factor(region))
+```
+
+```{r}
+# Shorten long region name
+regions <- regions %>%
+  mutate(region_name = ifelse(region_name == "New York and New Jersey, Puerto Rico, Virgin Islands",
+                               "NY-NJ-PR-VI",
+                               region_name))
+
+print(regions)
+```
+
+### Step 5: Add a region and region name columns to the population data frame.
+
+```{r}
+population <- population %>%
+  left_join(regions, by = "state_name")
+
+# Print first few rows
+head(population)
+```
+
+### Step 6: CDC COVID cases data
+
+```{r}
+api <- "https://data.cdc.gov/resource/pwn4-m3yp.json"
+request <- request(paste0(api, paste0("?$limit=10000000000")))
+response <- request |> req_perform() |> resp_body_string()
+cases_raw <- fromJSON(response)
+
+# Print first few rows
+head(cases_raw)
+```
+
+\# Answer if we replace "?\$limit=10000000000" with "", the API returns a limited number of records not the entire dataset so we end up having an incomplete dataset.
+
+### Step 7: Wrangle cases data
+
+```{r}
+cases <- cases_raw %>%
+  select(state = state, 
+         date = end_date, 
+         cases = new_cases) %>%
+  mutate(cases = as.numeric(cases)) %>%
+  mutate(date = ymd_hms(date)) %>%
+  mutate(date = as_date(date))
+
+# Print first few rows
+head(cases)
+```
+
+### Step 8: Merge with population data
+
+```{r}
+cases_full <- cases %>%
+  mutate(year = year(date)) %>%
+  left_join(population, by = c("state", "year"))
+
+# Add epi week and year
+cases_full <- cases_full %>%
+  mutate(
+    epi_week = epiweek(date),
+    epi_year = epiyear(date)
+  )
+
+# Order by date within state
+cases_full <- cases_full %>%
+  arrange(state, date)
+
+# Print first few rows
+head(cases_full)
+```
