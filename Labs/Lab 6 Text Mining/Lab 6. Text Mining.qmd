@@ -1,0 +1,213 @@
+---
+title: "LAB 6. Text Mining "
+author: "Faith Okaalo"
+date: 02/19/2026
+format: 
+  html:
+    embed-resources: true
+    code-fold: false
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+editor: visual
+---
+
+## **Lab 6: Text Mining**
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+### Load required libraries
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidytext)
+library(tidyr)
+```
+
+### Read in the data
+
+```{r}
+mtsamples <- read.csv("https://raw.githubusercontent.com/dmcable/BIOSTAT620W26/main/data/mtsamples/mtsamples.csv")
+
+head(mtsamples)
+```
+
+### **Question 1: What specialties do we have? Are these categories related? Overlapping? Evenly distributed?**
+
+```{r}
+mtsamples %>%
+  count(medical_specialty, sort = TRUE)
+```
+
+There are 40 specialty categories in the dataset. They are not evenly distributed: surgery has the most transcriptions, while most of the other specialties have a few records.
+
+### **Question 2: Tokenize and visualize the top 20 words**
+
+```{r}
+tokens <- mtsamples %>%
+  unnest_tokens(word, transcription)
+
+tokens %>%
+  count(word, sort = TRUE) %>%
+  slice_max(n, n = 20) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Most Frequent Words in Medical Transcriptions",
+    x = "Word",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
+The most common words in the dataset are 'the", "and", "was", "of", "to", "a", "with", "in", "is", "patient", "no", "she", "for", "he", "were", "on', "this", "at", "then", and "right." "The" was the most common word. These are mostly stop words which is expected in English language though they do not offer any meaningful insights.
+
+### **Question 3: Remove stop words and numbers**
+
+```{r}
+tokens_clean <- tokens %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(!grepl("^[0-9]+$", word))  
+
+tokens_clean %>%
+  count(word, sort = TRUE) %>%
+  slice_max(n, n = 20) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Words After Removing Stop Words and Numbers",
+    x = "Word",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
+After removing the stop words the stop words and numbers, the top words are now medical terms such as "patient", "history", "left", "normal", "procedure", "pain". These terms make sense given these are clinical transcriptions. These words now give us much better information about patients.
+
+### **Question 4: Tokenize into bi-grams and tri-grams**
+
+```{r}
+bigrams <- mtsamples %>%
+  unnest_ngrams(bigram, transcription, n = 2)
+
+bigrams %>%
+  count(bigram, sort = TRUE) %>%
+  slice_max(n, n = 20) %>%
+  ggplot(aes(x = reorder(bigram, n), y = n)) +
+  geom_col(fill = "coral") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Bi-grams in Medical Transcriptions",
+    x = "Bi-gram",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+```
+
+For the bi-grams the most frequent words were "the patient", "of the", "in the", "to the" and "was then"
+
+**Tri-grams**
+
+```{r}
+trigrams <- mtsamples %>%
+  unnest_ngrams(trigram, transcription, n = 3)
+
+trigrams %>%
+  count(trigram, sort = TRUE) %>%
+  slice_max(n, n = 20) %>%
+  ggplot(aes(x = reorder(trigram, n), y = n)) +
+  geom_col(fill = "mediumseagreen") +
+  coord_flip() +
+  labs(
+    title = "Top 20 Tri-grams in Medical Transcriptions",
+    x = "Tri-gram",
+    y = "Count"
+  ) +
+  theme_minimal()
+```
+
+For the tri-grams the most frequent words were "the patient was", "the patient is" and "as well as".
+
+### Question 5: Pick a word from question 4 and count how many words appear before or after it.
+
+**I selected the word patient.**
+
+**Words before it**
+
+```{r}
+bigrams_separated <- bigrams %>%
+  separate(bigram, into = c("word1", "word2"), sep = " ")
+
+before_pain <- bigrams_separated %>%
+  filter(word2 == "pain") %>%
+  count(word1, sort = TRUE) %>%
+  slice_max(n, n = 10)
+
+print("Words appearing BEFORE 'pain':")
+before_pain
+```
+
+The words that often appear before the word pain include "chest", "back", "abdominal", "the", "neck", "for", "of", "and", "his", and "her".
+
+**Words that appear after the word pain**
+
+```{r}
+after_pain <- bigrams_separated %>%
+  filter(word1 == "pain") %>%
+  count(word2, sort = TRUE) %>%
+  slice_max(n, n = 10)
+
+print("Words appearing AFTER 'pain':")
+after_pain
+```
+
+The top ten words that often appear after pain include "and", "in", "or", "with", "is", "he", "the", "she", "no", and "medications".
+
+### Question 6: Words that are often used in each of the specialties. 
+
+```{r}
+specialty_words <- mtsamples %>%
+  unnest_tokens(word, transcription) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(!grepl("^[0-9]+$", word)) %>%
+  count(medical_specialty, word, sort = TRUE) %>%
+  group_by(medical_specialty) %>%
+  top_n(5, n) %>%
+  arrange(medical_specialty, desc(n))
+
+specialty_words
+```
+
+The terms *“patient”* and *“history”* appeared among the top-ranked words in the majority of specialties (e.g., Surgery: patient = 4,855; Consult – History & Physical: history = 2,820). Additional common terms such as *“normal,” "left", “pain,”* and *“procedure”* were observed across multiple clinical domains, such as Autopsy, Chiropractic, Dentistry, and Dermatology. Procedural fields such as Surgery, Orthopedics, Neurosurgery, and Urology had high frequencies of intervention-specific terminology, including *“procedure,” “incision,”* and *“anesthesia.”* Organ-system specialties used words reflective of their clinical focus, such as *“thyroid”* and *“gland”* in Endocrinology, *“colon”* in Gastroenterology, *“renal”* and *“kidney”* in Nephrology, and *“eye”* and *“anterior chamber”* in Ophthalmology. The Dermatology and Pathology specialty, frequently included quantitative descriptors such as *“cm,” “mass,”* and *“tumor.”* Specialties such as Psychiatry/Psychology, Hospice/Palliative Care, and Pediatrics had words such as *“mother,” “daughter,”* and *“family.”*
+
+### Question 7: Rate of pain across specialties.
+
+```{r}
+mtsamples %>%
+  unnest_tokens(word, transcription) %>%
+  group_by(medical_specialty) %>%
+  summarise(
+    total_words = n(),
+    pain_count = sum(word == "pain")
+  ) %>%
+  mutate(pain_rate = pain_count / total_words) %>%
+  filter(total_words > 500) %>%  # keep only specialties with enough data
+  arrange(desc(pain_rate)) %>%
+  ggplot(aes(x = reorder(medical_specialty, pain_rate), y = pain_rate)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(
+    title = "Rate of Word 'Pain' by Medical Specialty",
+    x = "Specialty",
+    y = "Proportion of All Words"
+  ) +
+  theme_minimal()
+```
+
+Specialties such as Chiropractic, Physical Medicine Rehab, Emergency Room Reports, Pain Management, and Orthopedics use the word 'pain' at a much higher rate than other specialties, such as Ophthalmology, Autopsy, Cosmetic or Plastic Surgery, or Lab Medicine.
