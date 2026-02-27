@@ -1,0 +1,193 @@
+---
+title: "Lab 7: Web scraping"
+author: "Faith Okaalo"
+date: 02/27/2026
+format: 
+  html:
+    embed-resources: true
+    code-fold: false
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+editor: visual
+---
+
+### **Load necessary packages**
+
+```{r}
+library(xml2)
+library(stringr)
+library(httr)
+library(knitr)
+```
+
+### Question 1: How many Sars-Cov-2 papers?
+
+**Download the website**
+
+```{r}
+website <- xml2::read_html("https://pubmed.ncbi.nlm.nih.gov/?term=sars-cov-2")
+
+```
+
+**Finding the counts**
+
+```{r}
+counts <- xml2::xml_find_first(website, "//span[@class='value']")
+```
+
+**Turn it into text**
+
+```{r}
+counts <- as.character(counts)
+```
+
+**Extract data using Regex**
+
+```{r}
+totalcount <- stringr::str_extract(counts, "[0-9,\\.]+")
+```
+
+**Removing any commas/dots so that we can convert to numeric**
+
+```{r}
+totalcount <- gsub("[,\\.]", "", totalcount)
+totalcount <- as.numeric(totalcount)
+print(totalcount)
+```
+
+Answer: There are 270,174 Sars-Cov-2 papers indexed on PubMed.
+
+### **Question 2: Get article abstracts and authors**
+
+**Read in text, each line is a separate character**
+
+```{r}
+abstracts <- readLines("C:/Users/faith/Downloads/abstract-sars-cov-2-set.txt", warn = FALSE)
+
+```
+
+**Combine all text into one character**
+
+```{r}
+abstracts <- paste(abstracts, collapse = "\n")
+```
+
+**Split the text whenever 3 new lines occur in a row**
+
+```{r}
+abstracts <- strsplit(abstracts, "\n\n\n")[[1]]
+```
+
+**Replace any remaining "\\n" symbols with spaces**
+
+```{r}
+abstracts <- gsub("\n", " ", abstracts)
+```
+
+**Replace multiple spaces with single space**
+
+```{r}
+abstracts <- gsub("\\s{2,}", " ", abstracts)
+
+cat("Number of abstracts:", length(abstracts), "\n")
+```
+
+### Question 3: Distribution of Universities
+
+```{r}
+institution <- str_extract_all(
+  abstracts,
+  "([A-Z][a-zA-Z]+ )+(University|Institute)( of [A-Z][a-zA-Z]+)*|University of [A-Z][a-zA-Z]+"
+)
+
+institution <- unlist(institution)
+inst_table <- sort(table(institution), decreasing = TRUE)
+
+cat("\nTop 10 most common institutions:\n")
+print(head(inst_table, 10))
+```
+
+The ten most frequently mentioned institutions in SARS-CoV-2 Michigan abstracts from 2020–2021 were led by the University of Michigan (2,030 mentions), followed by Michigan State University (382) and the University of California (320). Other commonly cited institutions included Wayne State University (237), the University of Pennsylvania (179), Johns Hopkins University (149), the University of Washington (130), the National Institute (128), Vanderbilt University (107), and Stanford University (106).
+
+**Ways to improve our results**
+
+1.  Remove false matches: the "National Institute" is not a specific institution name, yet it was picked. We could filter these out by adding exceptions to the regex or by removing results that are not meaningful.
+2.  Duplicate counting: the same institution may appear multiple times in a single abstract (e.g., in each author's affiliation), thereby inflating the counts.
+3.  Name variations: the same institution might appear in different forms (e.g., Univ. of Michigan vs U of M), causing undercounting.
+
+### Question 4: Make a tidy dataset
+
+**Read in text each line is a separate character**
+
+```{r}
+abstracts_raw <- readLines("C:/Users/faith/Downloads/abstract-sars-cov-2-set.txt", warn = FALSE)
+```
+
+**Combine all text into one character**
+
+```{r}
+abstracts_raw <- paste(abstracts_raw, collapse = "\n")
+```
+
+**Split the text whenever 3 new lines occur in a row indicating two blank lines**
+
+```{r}
+abstracts_raw <- strsplit(abstracts_raw, "\n\n\n")[[1]]
+```
+
+**Extract the journal title for each article**
+
+```{r}
+journal <- str_extract(
+  abstracts_raw,
+  "(?<=\\d\\.\\s{1,10})[A-Za-z][^\n]+?(?=\\.\\s*20[0-9]{2})"
+)
+```
+
+**Extract the title for each article**
+
+```{r}
+titles <- sapply(abstracts_raw, function(x) {
+  unlist(strsplit(x, split = "\n\n"))[2]
+}, USE.NAMES = FALSE)
+titles <- gsub("\n", " ", titles)
+```
+
+**Extract authors**
+
+```{r}
+authors <- sapply(abstracts_raw, function(x) {
+  unlist(strsplit(x, split = "\n\n"))[3]
+}, USE.NAMES = FALSE)
+authors <- gsub("\n", " ", authors)
+
+```
+
+**Authors affiliations**
+
+```{r}
+affiliations <- str_extract(
+  abstracts_raw,
+  "Author information:[\\s\\S]+?(?=\n\n)")
+affiliations <- gsub("\n", " ", affiliations)
+affiliations <- gsub("Author information: ", "", affiliations)
+```
+
+**Build a dataframe**
+
+```{r}
+papers <- data.frame(
+  journal      = journal,
+  title        = titles,
+  authors      = substr(authors, 1, 100),
+  affiliations = substr(affiliations, 1, 100),
+  stringsAsFactors = FALSE)
+
+```
+
+**Print**
+
+```{r}
+knitr::kable(papers[1:5, ])
+```
