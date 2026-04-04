@@ -1,0 +1,30 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Faith Imbiti Okaalo professional Website"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: about.qmd
+        text: About
+      
+      
+    right:
+      - icon: github
+        href: https://github.com/FaithOkaalo
+
+  page-footer:
+    left: "© 2025 Faith Okaalo"
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    css: styles.css
+    toc: true
+
+

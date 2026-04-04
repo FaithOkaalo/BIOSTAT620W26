@@ -1,0 +1,24 @@
+---
+title: "Faith Imbiti Okaalo"
+about:
+  template: jolla
+  image: profile.JPG
+  links:
+    - icon: github
+      text: GitHub
+      href: https://github.com/FaithOkaalo
+    - icon: linkedin
+      text: LinkedIn
+      href: https://linkedin.com/in/your-real-linkedin-url
+    - icon: envelope
+      text: Email
+      href: mailto:fokaalo@umich.edu
+---
+
+Hi! I'm a doctoral student in the Health Behavior and Health Equity Department at the School of Public Health, University of Michigan. My research interests lie at the intersection of sexual and reproductive health and HIV/AIDS, with a focus on adolescent girls and young women in Kenya.
+
+I am particularly interested in exploring the HIV care cascade—prevention, treatment, and long-term management—and how various factors affect AGYW's engagement at each stage. Given the heightened vulnerability of AGYW to HIV, my work aims to understand how systemic, social, and individual factors influence their ability to access and retain care.
+
+By examining the roles of stigma, healthcare provider attitudes, and health system-level barriers, I hope to identify strategies to improve care retention and health outcomes. Ultimately, my research seeks to contribute to reducing HIV-related health disparities and promoting equitable access to SRH services for AGYW in sub-Saharan Africa.
+
+Feel free to explore my site or [email me](mailto:fokaalo@umich.edu)!
