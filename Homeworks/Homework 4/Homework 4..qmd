@@ -1,0 +1,391 @@
+---
+title: "BIOSTAT 620 Homework 4: HPC, SGL and Interactive plots"
+author: "Faith Okaalo"
+date: "03/29/2026"
+format: 
+  html:
+    embed-resources: true
+    code-fold: false
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+  error: false
+editor: visual
+---
+
+Load required libraries
+
+```{r}
+library(microbenchmark)
+library (ggplot2)
+library(parallel)
+library (patchwork)
+library(plotly)
+library(dplyr)
+```
+
+# **HPC**
+
+For Questions 1-2, rewrite the provided R functions to make them faster. It is OK (and recommended) to take a look at StackOverflow and Google.
+
+Using the synthetic dataset provided, show that your new function returns the same output as the original function. Then use `microbenchmark` to show that your version is faster and provide a visualization of the runtimes.
+
+### **Question 1 (6 points)**
+
+-   `fun2`: Calculate the running (cumulative) total along each row of a numeric matrix. Output should be a matrix with dimensions equal to the input matrix.
+
+```{r}
+# running cumulative sum by row
+fun2 <- function(mat) {
+  n <- nrow(mat)
+  k <- ncol(mat)
+  ans <- mat
+  for (i in 1:n) {
+    for (j in 2:k) {
+      ans[i,j] <- mat[i, j] + ans[i, j - 1]
+    }
+  }
+  ans
+}
+
+fun2alt <- function(mat) {
+  t(apply(mat, 1, cumsum))
+}
+```
+
+**Generate and test using the following synthetic data (`dat`):**
+
+```{r}
+# Generate data
+set.seed(2315)
+dat <- matrix(rnorm(200 * 100), nrow = 200)
+
+# Verify same output
+all.equal(fun2(dat), fun2alt(dat))
+
+# Benchmark
+mb1 <- microbenchmark(
+  Original  = fun2(dat),
+  Optimized = fun2alt(dat),
+  times = 100
+)
+print(mb1)
+autoplot(mb1) + labs(title = "Q1: Runtime Comparison") + theme_minimal()
+```
+
+Both functions give the same output. The optimized version was faster than the original. The median runtime reduced from 953 microseconds from the original to 343 for the optimized. This is reinforced by the violin plot.
+
+### **Question 2 (8 points)**
+
+-   `fun3`: Calculate the running (cumulative) total of a vector, where the sum resets when a zero is encountered.
+
+```{r}
+fun3 <- function(x) {
+  out <- numeric(length(x))
+  cumsum_x <- 0
+  for (i in seq_along(x)) {
+    if (x[i] == 0) {
+      cumsum_x <- 0
+    } else {
+      cumsum_x <- cumsum_x + x[i] 
+    }
+    out[i] <- cumsum_x
+  }
+  out
+}
+
+
+fun3alt <- function(x) {
+  cs <- cumsum(x)
+  zero_pos <- which(x == 0)
+  if (length(zero_pos) == 0) return(cs)
+  offsets <- c(0, cs)[zero_pos]
+  offset_vec <- numeric(length(x))
+  offset_vec[zero_pos] <- offsets
+  cs - cummax(offset_vec)
+}
+
+# Generate data
+set.seed(42)
+x_test <- sample(0:5, 10000, replace = TRUE)
+
+# Verify same output
+all.equal(fun3(x_test), fun3alt(x_test))
+
+# Benchmark
+mb2 <- microbenchmark(
+  Original  = fun3(x_test),
+  Optimized = fun3alt(x_test),
+  times = 100
+)
+print(mb2)
+autoplot(mb2) + labs(title = "Q2: Runtime Comparison") + theme_minimal()
+```
+
+The speedup for question 2 is even more dramatic. The median runtime dropped from 418 microseconds in the original to 88 in the optimized which is close to 4.8 times speedup.
+
+### **Question 3 (12 points)**
+
+For this question, we will ask you to parallelize a process for computationally estimating the value of pi
+
+The following function allows us to estimate pi through a simple simulation:
+
+```{r}
+# serial
+sim_pi <- function(n = 1000, i = NULL) {
+  p <- matrix(runif(n * 2), ncol = 2)
+  mean(rowSums(p^2) < 1) * 4
+}
+
+# Serial version
+set.seed(1231)
+time_serial <- system.time({
+  ans_serial <- unlist(lapply(1:4000, sim_pi, n = 10000))
+  print(mean(ans_serial))
+})
+print(time_serial)
+
+```
+
+```{r}
+# Parallelize
+cl <- makeCluster(detectCores())
+clusterSetRNGStream(cl, 1231)
+
+time_parallel <- system.time({
+  ans_parallel <- unlist(parLapply(cl, 1:4000, sim_pi, n = 10000))
+  print(mean(ans_parallel))
+})
+
+stopCluster(cl)
+print(time_parallel)
+```
+
+**Visualization**
+
+```{r}
+# Plot 1: similar estimate distributions
+results_df <- data.frame(
+  estimate = c(ans_serial, ans_parallel),
+  method   = rep(c("Serial", "Parallel"), each = 4000)
+)
+
+p1 <- ggplot(results_df, aes(x = estimate, fill = method)) +
+  geom_histogram(bins = 50, alpha = 0.6, position = "identity") +
+  geom_vline(xintercept = pi, linetype = "dashed") +
+  labs(title = "Pi Estimates: Serial vs Parallel", x = "Estimated Pi", y = "Count") +
+  theme_minimal()
+
+# Plot 2: runtime comparison
+timing_df <- data.frame(
+  method  = c("Serial", "Parallel"),
+  elapsed = c(time_serial["elapsed"], time_parallel["elapsed"])
+)
+
+p2 <- ggplot(timing_df, aes(x = method, y = elapsed, fill = method)) +
+  geom_col(width = 0.5, show.legend = FALSE) +
+  geom_text(aes(label = round(elapsed, 2)), vjust = -0.4) +
+  labs(title = "Elapsed Time (seconds)", x = NULL, y = "Seconds") +
+  theme_minimal()
+
+p1 + p2
+```
+
+Both methods gave almost identical estimates (the serial version 3.14124 and the parallel 3.141144), which are both close to the true pi value of 3.14159. The histogram on the left indicates that the distributions are centered at the dashed line which is the true pi value and have nearly identical spreads. This means that parallelization did not compromise accuracy. The bar chart on the right shows that the parallel version (0.64seconds) was about 2.6 times faster than the serial version (1.7seconds), because it ran the 4000 simulations across multiple cores at the same time instead of one after another.
+
+# **SQL**
+
+```{r}
+library(RSQLite)
+library(DBI)
+
+con <- dbConnect(SQLite(), ":memory:")   
+surveys <- read.csv("C:/Users/faith/Downloads/surveys.csv")
+species  <- read.csv("C:/Users/faith/Downloads/species.csv")
+plots    <- read.csv("C:/Users/faith/Downloads/plots.csv")
+
+dbWriteTable(con, "surveys", surveys, overwrite = TRUE)
+dbWriteTable(con, "species",  species,  overwrite = TRUE)
+dbWriteTable(con, "plots",    plots,    overwrite = TRUE)
+ 
+```
+
+## **Question 4 (6 points)**
+
+First, using the approach from Lab 9, create a query to to see the structure of the surveys table. Then, using the surveys table, write a query to display the three date fields, species_id, and weight in kilograms (rounded to two decimal places), for individuals captured in 1999, ordered alphabetically by the species_id.
+
+```{r pragma}
+dbGetQuery(con, "PRAGMA table_info(surveys)")
+```
+
+```{sql connection= con}
+
+SELECT month, day, year, species_id,
+       ROUND(weight / 1000.0, 2) AS weight_kg
+FROM surveys
+WHERE year = 1999
+ORDER BY species_id ASC;
+```
+
+## **Question 5 (6 points)**
+
+Write a query that returns: the total weight, average weight, minimum and maximum weights for all animals caught over the duration of the survey. Can you modify it so that it outputs these values only for weights between 5 and 10 inclusive?
+
+**Total weight, average weight, minimum and maximum weights for all animals caught over the duration of the survey.**
+
+```{sql connection= con}
+SELECT SUM(weight)  AS total_weight,
+       AVG(weight)  AS avg_weight,
+       MIN(weight)  AS min_weight,
+       MAX(weight)  AS max_weight
+FROM surveys;
+```
+
+**Weights between 5 and 10 inclusive**
+
+```{sql connection= con}
+SELECT SUM(weight)  AS total_weight,
+       AVG(weight)  AS avg_weight,
+       MIN(weight)  AS min_weight,
+       MAX(weight)  AS max_weight
+FROM surveys
+WHERE weight BETWEEN 5 AND 10;
+```
+
+## **Question 6 (8 points)**
+
+Write a single query that returns:
+
+1.  How many were counted each year, for each different species
+
+2.  The average weights of each species in each year
+
+Show the result and also store the resulting SQL data table as an R object. Hint, use the R function `DBI::dbGetQuery`. Note: to do so, you may need to, rather than running a SQL chunk, call SQL within an R chunk.
+
+```{r}
+q6_result <- DBI::dbGetQuery(con, "
+  SELECT year, species_id,
+         COUNT(*)    AS n_captured,
+         AVG(weight) AS avg_weight
+  FROM surveys
+  GROUP BY year, species_id
+  ORDER BY year, species_id;
+")
+
+head(q6_result, 20)
+```
+
+## **Question 7 (8 points)**
+
+Write a query that returns, from the species table, the number of species in each taxa, only for the taxa with more than 10 species.
+
+```{sql connection= con}
+SELECT taxa, COUNT(species_id) AS n_species
+FROM species
+GROUP BY taxa
+HAVING n_species > 10
+ORDER BY n_species DESC;
+```
+
+## **Question 8 (10 points)**
+
+Write a query that returns the number of animals caught of each genus in each plot. Order the results by plot number (ascending) and by descending number of individuals in each plot. Show the result and also store the resulting SQL data table as an R object.
+
+```{r}
+q8_result <- DBI::dbGetQuery(con, "
+  SELECT sv.plot_id, sp.genus,
+         COUNT(*) AS n_individuals
+  FROM surveys AS sv
+  INNER JOIN species AS sp ON sv.species_id = sp.species_id
+  GROUP BY sv.plot_id, sp.genus
+  ORDER BY sv.plot_id ASC, n_individuals DESC;
+")
+
+head(q8_result, 20)
+```
+
+## **Question 9 (8 points)**
+
+How many specimens of each species were captured in each type of plot, excluding specimens of unknown species?
+
+```{sql connection= con}
+SELECT pl.plot_type, sv.species_id, COUNT(*) AS n_specimens
+FROM surveys AS sv
+INNER JOIN plots AS pl ON sv.plot_id = pl.plot_id
+WHERE sv.species_id IS NOT NULL
+  AND sv.species_id != 'SP'
+GROUP BY pl.plot_type, sv.species_id
+ORDER BY pl.plot_type, n_specimens DESC;
+```
+
+## **Question 10 (8 points)**
+
+Write a query that finds the average weight of each rodent species (i.e., only include species with Rodent in the taxa field).
+
+```{sql connection= con}
+SELECT sv.species_id, sp.genus, sp.species,
+       ROUND(AVG(sv.weight), 2) AS avg_weight_g
+FROM surveys AS sv
+INNER JOIN species AS sp ON sv.species_id = sp.species_id
+WHERE sp.taxa = 'Rodent'
+  AND sv.weight IS NOT NULL
+GROUP BY sv.species_id
+ORDER BY avg_weight_g DESC;
+```
+
+## **Question 11 (10 points)**
+
+Using `plotly::ggplotly` and the data table resultant from question 8, make an interactive grouped bar chart of the number of species by plot id, subseting to plot id 1-5.
+
+```{r}
+q8_sub <- q8_result %>%
+  filter(plot_id %in% 1:5) %>%
+  mutate(plot_id = factor(plot_id))
+
+p_bar <- ggplot(q8_sub, aes(x = plot_id, y = n_individuals, fill = genus)) +
+  geom_col(position = "dodge") +
+  labs(title = "Individuals by Genus for Plots 1-5",
+       x = "Plot ID", y = "Count", fill = "Genus") +
+  theme_minimal()
+
+ggplotly(p_bar)
+```
+
+## **Question 12 (10 points)**
+
+Using native `plotly` functions (no `ggplot2`) and the data table resultant from question 6, make an interactive line chart of average species weight over time for each species. Make sure to properly handle missing data. Can you do anything to reduce the noise in your plot?
+
+```{r}
+q6_clean <- q6_result %>%
+  filter(!is.na(avg_weight))
+
+species_keep <- q6_clean %>%
+  group_by(species_id) %>%
+  summarise(n_years = n_distinct(year)) %>%
+  #  Noise reduced by keeping only species observed in at least 10 different years
+  filter(n_years >= 10) %>%  
+  pull(species_id)
+
+q6_filtered <- q6_clean %>%
+  filter(species_id %in% species_keep)
+
+plot_ly(q6_filtered,
+        x = ~year,
+        y = ~avg_weight,
+        color = ~species_id,
+        type  = "scatter",
+        mode  = "lines+markers",
+        connectgaps = FALSE) %>%
+  layout(
+    title = "Average Weight Over Time by Species",
+    xaxis = list(title = "Year"),
+    yaxis = list(title = "Average Weight (g)")
+  )
+```
+
+```{r cleanup, include=FALSE}
+dbDisconnect(con)
+```
